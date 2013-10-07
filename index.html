@@ -1,0 +1,400 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <title></title>
+    <meta content="">
+    <style></style>
+
+	<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+  
+	<script id="shader-fs" type="x-shader/x-fragment">
+		precision mediump float;
+
+		varying vec4 vColor;
+
+		void main(void) {
+			gl_FragColor = vColor;
+		}
+	</script>
+
+	<script id="shader-vs" type="x-shader/x-vertex">
+		attribute vec3 aVertexPosition;
+		attribute vec4 aVertexColor;
+
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+
+		varying vec4 vColor;
+
+		void main(void) {
+			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+			vColor = aVertexColor;
+		}
+	</script>  
+
+	
+	<script>
+		function start() {
+			var canvas = getCanvas();
+			canvas.width = document.width;
+			canvas.height = document.height;
+			
+			webGLStart();
+		}
+	
+		function webGLStart() {
+			var canvas = getCanvas();
+			initGL(canvas);
+			initShaders();
+			initBuffers();
+
+			gl.clearColor(0.0, 0.0, 0.0, 1.0);
+			gl.enable(gl.DEPTH_TEST);
+
+			requestAnimFrame(generateAnimFrame);
+		}	
+		
+		var gl;
+		function initGL(canvas) {
+			try {
+				gl = canvas.getContext("experimental-webgl");
+				gl.viewportWidth = canvas.width;
+				gl.viewportHeight = canvas.height;
+			} 
+			catch (e) {
+			}
+			if (!gl) {
+				alert("Could not initialise WebGL, sorry :-(");
+			}
+		}
+		
+		function getShader(gl, id) {
+			var shaderScript = document.getElementById(id);
+			if (!shaderScript) {
+				return null;
+			}
+
+			var str = "";
+			var k = shaderScript.firstChild;
+			while (k) {
+				if (k.nodeType == 3) {
+					str += k.textContent;
+				}
+				k = k.nextSibling;
+			}
+
+			var shader;
+			if (shaderScript.type == "x-shader/x-fragment") {
+				shader = gl.createShader(gl.FRAGMENT_SHADER);
+			} else if (shaderScript.type == "x-shader/x-vertex") {
+				shader = gl.createShader(gl.VERTEX_SHADER);
+			} else {
+				return null;
+			}
+
+			gl.shaderSource(shader, str);
+			gl.compileShader(shader);
+
+			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+				alert(gl.getShaderInfoLog(shader));
+				return null;
+			}
+
+			return shader;
+		}
+		
+		var shaderProgram;
+
+		function initShaders() {
+			var fragmentShader = getShader(gl, "shader-fs");
+			var vertexShader = getShader(gl, "shader-vs");
+
+			shaderProgram = gl.createProgram();
+			gl.attachShader(shaderProgram, vertexShader);
+			gl.attachShader(shaderProgram, fragmentShader);
+			gl.linkProgram(shaderProgram);
+
+			if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+				alert("Could not initialise shaders");
+			}
+
+			gl.useProgram(shaderProgram);
+
+			shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+			gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+			shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+			gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+
+			shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+			shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+		}
+		
+
+		
+		var triangleVertexPositionBuffer;
+		var triangleVertexColorBuffer;
+		var squareVertexPositionBuffer;
+		var squareVertexColorBuffer;
+		
+		function initBuffers() {
+			var planet = generatePlanet(2, 200, sineWaveDisplacement);
+		
+			triangleVertexPositionBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(planet.vertices), gl.STATIC_DRAW);
+			triangleVertexPositionBuffer.itemSize = 3;
+			triangleVertexPositionBuffer.numItems = planet.vertexCount;
+			
+			triangleVertexColorBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer);
+
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(planet.colors), gl.STATIC_DRAW);
+			triangleVertexColorBuffer.itemSize = 4;
+			triangleVertexColorBuffer.numItems = planet.vertexCount;
+		}
+		
+		var mvMatrix = mat4.create();
+		var pMatrix = mat4.create();
+
+		function setMatrixUniforms() {
+			gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+			gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+		}
+		
+		var planetAngle = 0;
+		
+		function drawScene() {
+			gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+			mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+			mat4.identity(mvMatrix);
+			mat4.translate(mvMatrix, [-1.5, 0.0, -7.0]);
+			mat4.rotate(mvMatrix, planetAngle, [0.15, 1, 0.3]);
+			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+			gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer);
+			gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, triangleVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+			setMatrixUniforms();
+			gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
+
+		}
+			
+		function getCanvas() {
+			return document.getElementById("canvas");
+		}
+		
+		function sqr(x) { return x * x; }
+		
+		function distance(a, b) {
+			return Math.sqrt(sqr(a[0]-b[0]) + sqr(a[1]-b[1]) + sqr(a[2]-b[2]));
+		}
+		
+		// returns the surface of triangle using Heron's formula
+		function triangleSurface(a, b, c) {
+			var s = (a + b + c) / 2;
+			return Math.sqrt(s * (s - a) * (s - b) * (s - c));
+		}
+		
+		// the more equilateral a triange is, the higher the returned value
+		function equilateralness(a, b, c) {
+			return triangleSurface(a, b, c) / sqr(a+b+c);
+		}
+		
+		// flattens a list of lists (up to any level)
+		function flatten(nestedList) {
+			var flattened = [];
+			for(var i = 0; i < nestedList.length; ++i) {
+				var elmt = nestedList[i];
+				if (elmt instanceof Array) {
+					flattened = flattened.concat(flatten(elmt));
+				}
+				else flattened.push(elmt);
+			}
+			return flattened;
+		}
+		
+		
+		function generateSphereCoordinates(radius, layerCount) {
+			if (layerCount < 3) {
+				throw new Exception("layerCount must be at least 3");
+			}
+			
+			var deltaAngle = Math.PI / (layerCount - 1);
+			var layerDistance = 2 * radius * Math.sin(deltaAngle / 2);
+			var targetSegmentLength = layerDistance / Math.cos(Math.PI / 6); // aiming for equilateral triangles
+			
+			var layers = [];
+			
+			// 1. generate points by layers
+			for(var i = 0; i < layerCount; ++i) {
+				var layerAngle = -Math.PI/2   + deltaAngle * i;
+				var y = radius * Math.sin(layerAngle);
+				var layerRadius = Math.cos(layerAngle) * radius;
+				var circumference = layerRadius * 2 * Math.PI;
+				var pointsInLayerCount = Math.max(1, Math.round(circumference / targetSegmentLength)); // at least one point, even at the poles
+				var actualSegmentLength = circumference / pointsInLayerCount;
+				
+				var deltaPointAngle = 2 * Math.PI / pointsInLayerCount;
+				
+				var layer = [];
+				
+				for(var j = 0; j < pointsInLayerCount; ++j) {
+					var angle = deltaPointAngle * j;
+					var x = layerRadius * Math.cos(angle);
+					var z = layerRadius * Math.sin(angle);
+					layer.push([x, y, z]);
+				}
+				
+				layers.push(layer);
+			}
+			
+			// 2. generate triangles, between 2 layers of points
+			var lowerOffset = 0;
+			var upperOffset = 0;
+			var getIndexOnLowerLayer = function(index) { return index + lowerOffset; }
+			var getIndexOnUpperLayer = function(index) { return index + upperOffset; }
+			
+			var triangles = [];
+			
+			for(var i = 0; i < layerCount - 1; ++i) {
+				var lowerLayer = layers[i];
+				var upperLayer = layers[i+1];
+			
+				var lowerIndex = 0;
+				var upperIndex = 0;
+				
+				lowerOffset = upperOffset;
+				upperOffset += lowerLayer.length;
+				
+				do {
+					// consider 2 possible triangles and pick the most equilateral one
+					var p1 = lowerLayer[lowerIndex];
+					var p2 = upperLayer[upperIndex];
+					var p3 = lowerLayer[(lowerIndex+1) % lowerLayer.length];
+					var p4 = upperLayer[(upperIndex+1) % upperLayer.length];
+					
+					var a = distance(p1, p2);
+					var b = distance(p1, p3);
+					var c = distance(p2, p4);
+					var d = distance(p1, p4);
+					var e = distance(p2, p3);
+					
+					if (equilateralness(a, c, d) > equilateralness(a, b, e)) {
+						triangles.push([getIndexOnLowerLayer(lowerIndex), getIndexOnUpperLayer((upperIndex+1) % upperLayer.length), getIndexOnUpperLayer(upperIndex)]);
+						upperIndex = (upperIndex + 1) % upperLayer.length;
+					}
+					else {
+						triangles.push([getIndexOnLowerLayer(lowerIndex), getIndexOnLowerLayer((lowerIndex+1) % lowerLayer.length), getIndexOnUpperLayer(upperIndex)]);	
+						lowerIndex = (lowerIndex + 1) % lowerLayer.length;
+					}
+					
+				} while (lowerIndex!=0 || upperIndex!=0)
+			}
+			
+			console.log("triangles= " + JSON.stringify(triangles));
+			
+			// 3. return triangles coordinates
+			// a. merge all layer vertices in one big list
+			var allVertices = [];
+			for(var i = 0; i < layers.length; ++i) {
+				allVertices = allVertices.concat(layers[i]);
+			}
+			
+			// b. map triangles based on point indexes to triangles based on coordinates
+			return triangles.map(function(indexes) {
+				return indexes.map(function(index) {
+					return allVertices[index];
+				});
+			});
+		}
+			
+			
+		var lastTick = 0;
+		function updateWorld() {
+			var currentTick = Date.now();
+			var tick = Math.min(500, currentTick - lastTick);
+			
+			planetAngle += tick/1000 * 0.3 * Math.PI;
+			
+			lastTick = currentTick;
+		}
+				
+				
+		function generateAnimFrame() {
+			updateWorld();
+			
+			drawScene();
+			
+			requestAnimFrame(generateAnimFrame);
+		}
+		
+		// displacement function
+		var sineWaveDisplacement = function(v) {
+			var amp = 0.1;
+			var d = 1 + amp * (Math.sin(v[0] * 2.5) * Math.sin(v[0] * 0.8 * (Math.cos(v[1])+1)) * Math.sin(v[1] * 0.5 * (2*Math.cos(0.3*v[2]+v[0])+10)) * Math.cos(v[2] * 2));
+			return Math.max(1, d);
+		}
+		
+		// returns vertices and colors in { vertices : [...] , colors : [...]} structure
+		function generatePlanet(radius, layerCount, displacementFunction) {
+			var displacementFunction = displacementFunction || function(v) { return 1; };
+			
+			var vertices = generateSphereCoordinates(radius, layerCount);
+			
+			var flatVertices = [];
+			var flatColors = [];
+			
+			for(var i = 0; i < vertices.length; ++i) {
+				var triangle = vertices[i];
+				for(var j = 0; j < triangle.length; ++j) {
+					var vertice = triangle[j];
+					var displacement = displacementFunction(vertice);
+					flatVertices.push(displacement * vertice[0], displacement * vertice[1], displacement * vertice[2]);
+					
+					if (displacement==1) { // sea
+						flatColors.push(0.05, 0.15, 0.5, 1.0);
+					}
+					else { // ground
+						flatColors.push(0.4, 0.3, 0.2, 1.0);
+					}
+				}
+			}
+			
+			var triangleCount = flatVertices.length / 9;
+			console.log("triangleCount: " + triangleCount);
+			return {
+				vertices : flatVertices,
+				colors : flatColors,
+				vertexCount : triangleCount * 3
+			};
+		}
+		
+		window.requestAnimFrame = (function() {
+			return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame ||
+			function(/* function */callback, /* DOMElement */element) {
+				window.setTimeout(callback, 1 / 60);
+			}
+
+		})();
+			
+			
+	</script>
+
+</head>
+
+  
+  
+<body onload="start();">
+	
+	<canvas id="canvas" style="border: none;" width="500" height="500"></canvas>
+
+	<br/>
+</body>
+
+</html>
