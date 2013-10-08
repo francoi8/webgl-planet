@@ -235,6 +235,7 @@
 			var layers = [];
 			
 			// 1. generate points by layers
+			var t0 = Date.now();
 			for(var i = 0; i < layerCount; ++i) {
 				var layerAngle = -Math.PI/2   + deltaAngle * i;
 				var y = radius * Math.sin(layerAngle);
@@ -256,6 +257,8 @@
 				
 				layers.push(layer);
 			}
+			var t1 = Date.now();
+			console.log("point generation: " + (t1-t0) + " ms");
 			
 			// 2. generate triangles, between 2 layers of points
 			var lowerOffset = 0;
@@ -299,6 +302,8 @@
 					
 				} while (lowerIndex!=0 || upperIndex!=0)
 			}
+			var t2 = Date.now();
+			console.log("triangle generation: " + (t2-t1) + " ms");
 			
 			//console.log("triangles= " + JSON.stringify(triangles));
 			
@@ -306,15 +311,32 @@
 			// a. merge all layer vertices in one big list
 			var allVertices = [];
 			for(var i = 0; i < layers.length; ++i) {
-				allVertices = allVertices.concat(layers[i]);
+				var layer = layers[i];
+				var n = layer.length;
+				for(var j = 0; j < n; ++j) {
+					allVertices.push(layer[j]);
+				}
 			}
 			
+			var t2b = Date.now();
+			
 			// b. map triangles based on point indexes to triangles based on coordinates
-			return triangles.map(function(indexes) {
+			/*var triangleCoordinates = triangles.map(function(indexes) {
 				return indexes.map(function(index) {
 					return allVertices[index];
 				});
-			});
+			});*/
+			var triangleCoordinates = new Array(triangles.length);
+			for(var i = 0; i < triangles.length; ++i) {
+				var triangle = triangles[i];
+				var coordinates = [allVertices[triangle[0]], allVertices[triangle[1]], allVertices[triangle[2]]];
+				triangleCoordinates[i] = coordinates;
+			}
+			
+			var t3 = Date.now();
+			console.log("map triangle coordinates: " + (t3-t2) + " ms (of which all vertice list generation:" + (t2b-t2) + "ms)");
+
+			return triangleCoordinates;
 		}
 			
 			
@@ -346,8 +368,7 @@
 			var sin = Math.sin;
 			var cos = Math.cos;
 			
-			var d = 1 + amp * (sin(x+0.4)*sin(y+7.8)+cos(z+randomSeed)*cos(y+0.53)+0.4*sin(3*x+2.5)*sin(4*z-4)
-			+0.10*sin(6*x-3*y+6.1)*sin(6*z+6.5)+0.04*cos(10*z+0.3)*sin(12*y+4));
+			var d = 1 + amp * (sin(x+0.4)*sin(y+7.8)+cos(z+randomSeed)*cos(y+0.53)+0.4*sin(3*x+2.5)*sin(4*z-4)+0.10*sin(6*x-3*y+6.1)*sin(6*z+6.5)+0.04*cos(10*z+0.3)*sin(12*y+4));
 			
 			return d;
 		}
@@ -406,6 +427,8 @@
 			var displacementFunction = displacementFunction || function(v) { return 1; };
 			
 			var vertices = generateSphereCoordinates(radius, layerCount);
+			
+			var t4 = Date.now();
 			
 			var flatVertices = [];
 			var flatColors = [];
@@ -472,6 +495,10 @@
 					}
 				}
 			}
+			
+			var t5 = Date.now();
+			console.log("displacement and color generation: " + (t5-t4) + " ms");
+
 			
 			var triangleCount = flatVertices.length / 9;
 			console.log("triangleCount: " + triangleCount);
