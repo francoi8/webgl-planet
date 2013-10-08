@@ -5,7 +5,7 @@
     <meta content="">
     <style></style>
 
-	<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+	<script type="text/javascript" src="glMatrix.2.2.0.min.js"></script>
   
 	<script id="shader-fs" type="x-shader/x-fragment">
 		precision mediump float;
@@ -169,11 +169,11 @@
 			gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-			mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+			mat4.perspective(pMatrix, 45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
 			mat4.identity(mvMatrix);
-			mat4.translate(mvMatrix, [-1.5, 0.0, -7.0]);
-			mat4.rotate(mvMatrix, planetAngle, [0.15, 1, 0.3]);
+			mat4.translate(mvMatrix, mvMatrix, [-1.5, 0.0, -7.0]);
+			mat4.rotate(mvMatrix, mvMatrix, planetAngle, [0.15, 1, 0.3]);
 			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
 			gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
