@@ -34,6 +34,9 @@
 
 	
 	<script>
+		var layerCount = 600;
+		var randomSeed = Math.random() * 10;
+	
 		function start() {
 			var canvas = getCanvas();
 			canvas.width = document.width;
@@ -138,7 +141,7 @@
 		var squareVertexColorBuffer;
 		
 		function initBuffers() {
-			var planet = generatePlanet(2, 500, sineWaveDisplacement);
+			var planet = generatePlanet(2, layerCount, sineWaveDisplacement);
 		
 			triangleVertexPositionBuffer = gl.createBuffer();
 			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
@@ -297,7 +300,7 @@
 				} while (lowerIndex!=0 || upperIndex!=0)
 			}
 			
-			console.log("triangles= " + JSON.stringify(triangles));
+			//console.log("triangles= " + JSON.stringify(triangles));
 			
 			// 3. return triangles coordinates
 			// a. merge all layer vertices in one big list
@@ -335,16 +338,66 @@
 		}
 		
 		// displacement function
-		var sineWaveDisplacement = function(v) {
+		function sineWaveDisplacement(v) {
 			var amp = 0.05;
 			var x = v[0]*2;
 			var y = v[1]*2;
 			var z = v[2]*2;
 			var sin = Math.sin;
 			var cos = Math.cos;
-			var d = 1 + amp * (sin(x+0.4)*sin(y+7.8)+cos(z+2.4)*cos(y+0.53)+0.4*sin(3*x+2.5)*sin(4*z-4)
+			
+			var d = 1 + amp * (sin(x+0.4)*sin(y+7.8)+cos(z+randomSeed)*cos(y+0.53)+0.4*sin(3*x+2.5)*sin(4*z-4)
 			+0.10*sin(6*x-3*y+6.1)*sin(6*z+6.5)+0.04*cos(10*z+0.3)*sin(12*y+4));
-			return Math.max(1, d);
+			
+			return d;
+		}
+		
+		// returns a triplet [r', g', b'] = [r, g, b] + random(-maxDelta, +maxDelta)
+		function randomColor(r, g, b, maxDelta) {
+			r += (Math.random()-0.5) * 2 * maxDelta;
+			g += (Math.random()-0.5) * 2 * maxDelta;
+			b += (Math.random()-0.5) * 2 * maxDelta;
+			return [
+				Math.min(Math.max(0, r), 1), 
+				Math.min(Math.max(0, g), 1), 
+				Math.min(Math.max(0, b), 1)
+				 ];
+		}
+		
+		function interpolateBetween2Colors(r1, g1, b1, r2, g2, b2, k) {
+			var k = Math.min(Math.max(0, k), 1);
+			return [
+				r1 * (1 - k) + r2 * k,
+				g1 * (1 - k) + g2 * k,
+				b1 * (1 - k) + b2 * k
+			];
+		}
+		
+		// interpolates a color where list = [{r:, g:, b:, x:}, ...]
+		// and is expected to be sorted by increasing values of x in [0, 1]
+		function interpolateAlongGradient(list, k) {
+			if (list.length < 1) {
+				throw new Exception("interpolateAlongGradient expects a list containing at least 1 element.");
+			}
+			
+			var index = 0;
+			while (list[index].x < k && index < list.length - 1) {
+				++index;
+			}
+			if (list[index].x < k || index == 0) {
+				return [
+					list[index].r,
+					list[index].g,
+					list[index].b ];
+			}
+			else {
+				var kk = (k - list[index - 1].x) / (list[index].x - list[index - 1].x);
+				
+				return interpolateBetween2Colors(
+					list[index-1].r, list[index-1].g, list[index-1].b, 
+					list[index].r, list[index].g, list[index].b, 
+					kk);
+			}
 		}
 		
 		
@@ -357,18 +410,65 @@
 			var flatVertices = [];
 			var flatColors = [];
 			
+			var seaColorScheme = 1;
+			var groundColorScheme = 2;
+			
 			for(var i = 0; i < vertices.length; ++i) {
 				var triangle = vertices[i];
 				for(var j = 0; j < triangle.length; ++j) {
 					var vertice = triangle[j];
 					var displacement = displacementFunction(vertice);
-					flatVertices.push(displacement * vertice[0], displacement * vertice[1], displacement * vertice[2]);
+					var effectiveDisplacement = Math.max(1, displacement);
+					flatVertices.push(effectiveDisplacement * vertice[0], effectiveDisplacement * vertice[1], effectiveDisplacement * vertice[2]);
 					
-					if (displacement==1) { // sea
-						flatColors.push(0.05, 0.15, 0.5, 1.0);
+					if (displacement<=1) { // sea
+						switch (seaColorScheme) {
+							case 0:
+								flatColors.push(0.05, 0.15, 0.5, 1.0);
+								break;
+								
+							case 1:
+								var seaColor = interpolateAlongGradient([
+										{r: 0.1, g: 0.3, b: 0.75, x: 0},
+										{r: 0.05, g: 0.15, b: 0.5, x: 0.04},
+										{r: 0.03, g: 0.1, b: 0.35, x: 0.1}
+									], (1-displacement) * 7);
+								flatColors.push(seaColor[0]); // red
+								flatColors.push(seaColor[1]); // green
+								flatColors.push(seaColor[2]); // blue
+								flatColors.push(1.0); // alpha
+								break;
+						}
 					}
 					else { // ground
-						flatColors.push(0.4, 0.3, 0.2, 1.0);
+						switch (groundColorScheme) {
+							case 0: // flat
+								flatColors.push(0.4, 0.3, 0.2, 1.0);
+								break;
+								
+							case 1: // random
+								var groundColor = randomColor(0.4, 0.3, 0.2, 0.1);
+								flatColors.push(groundColor[0]); // red
+								flatColors.push(groundColor[1]); // green
+								flatColors.push(groundColor[2]); // blue
+								flatColors.push(1.0); // alpha
+								break;
+								
+							case 2: // altitude based
+								var groundColor = interpolateAlongGradient([
+										{r: 0.6, g: 0.6, b: 0.3, x: 0},
+										{r: 0.3, g: 0.2, b: 0.1, x: 0.08},
+										{r: 0.1, g: 0.25, b: 0.1, x: 0.2},
+										{r: 0.35, g: 0.35, b: 0.35, x: 0.8},
+										{r: 0.8, g: 0.8, b: 0.8, x: 1.0}
+									], (displacement-1) * 7);
+								//interpolateBetween2Colors(0.2, 0.15, 0.1, 0.6, 0.6, 0.6, (displacement-1) * 7);
+								flatColors.push(groundColor[0]); // red
+								flatColors.push(groundColor[1]); // green
+								flatColors.push(groundColor[2]); // blue
+								flatColors.push(1.0); // alpha
+								break;
+						}
 					}
 				}
 			}
