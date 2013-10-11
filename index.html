@@ -3,7 +3,11 @@
   <head>
     <title></title>
     <meta content="">
-    <style></style>
+    <style>
+		* { margin: 0; padding: 0;}
+
+		body, html { height:100%; }
+    </style>
 
 	<script type="text/javascript" src="glMatrix.2.2.0.min.js"></script>
   
@@ -39,9 +43,11 @@
 	
 		function start() {
 			var canvas = getCanvas();
-			canvas.width = document.width;
-			canvas.height = document.height;
-			
+			//canvas.width = document.body.clientWidth;
+			//canvas.height = document.body.clientHeight;
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		
 			webGLStart();
 		}
 	
@@ -175,7 +181,7 @@
 			mat4.perspective(pMatrix, 45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
 			mat4.identity(mvMatrix);
-			mat4.translate(mvMatrix, mvMatrix, [-1.5, 0.0, -7.0]);
+			mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, -7.0]);
 			mat4.rotate(mvMatrix, mvMatrix, planetAngle, [0.15, 1, 0.3]);
 			gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
 			gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
@@ -351,14 +357,6 @@
 		}
 				
 				
-		function generateAnimFrame() {
-			updateWorld();
-			
-			drawScene();
-			
-			requestAnimFrame(generateAnimFrame);
-		}
-		
 		// displacement function
 		function sineWaveDisplacement(v) {
 			var amp = 0.05;
@@ -509,6 +507,14 @@
 			};
 		}
 		
+		function generateAnimFrame() {
+			updateWorld();
+			
+			drawScene();
+			
+			requestAnimFrame(generateAnimFrame);
+		}
+		
 		window.requestAnimFrame = (function() {
 			return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame ||
 			function(/* function */callback, /* DOMElement */element) {
@@ -524,9 +530,9 @@
 
   
   
-<body onload="start();">
+<body onload="start();" >
 	
-	<canvas id="canvas" style="border: none;" width="500" height="500"></canvas>
+	<canvas id="canvas" width=640 height=480></canvas>
 
 	<br/>
 </body>
