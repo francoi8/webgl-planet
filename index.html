@@ -87,6 +87,13 @@
 		var layerCount = 600;
 		var randomSeed = Math.random() * 10;
 		var useLighting = true;
+		var parameters = {
+			//ambientColor : [0.1, 0.1, 0.3],
+			//directionalColor : [1, 1, 0.7],
+			ambientColor : [0.1, 0.1, 0.5],
+			directionalColor : [1, 1, 0.1],
+			lightingDirection :  [1, 0, 0],
+		}
 	
 		function start() {
 			var canvas = getCanvas();
@@ -236,15 +243,15 @@
 			// lighting stuff
 			gl.uniform1i(shaderProgram.useLightingUniform, useLighting);
 			if (useLighting) {
-				gl.uniform3f(shaderProgram.ambientColorUniform, 0.1, 0.1, 0.1);
+				gl.uniform3f(shaderProgram.ambientColorUniform, parameters.ambientColor[0], parameters.ambientColor[1], parameters.ambientColor[2]);//, 0.1, 0.1, 0.1);
 				
-				var lightingDirection = [0, 0, 1];
+				var lightingDirection = parameters.lightingDirection; //[0, 0, 1];
 				var adjustedLD = vec3.create();
 				vec3.normalize(adjustedLD, lightingDirection);
 				vec3.scale(adjustedLD, adjustedLD, -1);
 				gl.uniform3fv(shaderProgram.lightingDirectionUniform, adjustedLD);
 				
-				gl.uniform3f(shaderProgram.directionalColorUniform, 0.8, 0.8, 0.8);
+				gl.uniform3f(shaderProgram.directionalColorUniform, parameters.directionalColor[0], parameters.directionalColor[1], parameters.directionalColor[2]);//0.8, 0.8, 0.8);
 			}
 		}
 		
